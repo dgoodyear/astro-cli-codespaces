@@ -17,6 +17,8 @@ with DAG (
     "hello_world", # Required
     start_date=datetime(2024,1,1), # Required
     #schedule="0/5 * * * *", # Used Cron Notation
+    #schedule=timedelta(hours=1), 
+    #schedule="@continuous", 
     schedule="@hourly", # Presets but get interpreted as cron 0 * * * * 
     
     catchup=False # Required - Should it run the Dag for the intervals that were missed
