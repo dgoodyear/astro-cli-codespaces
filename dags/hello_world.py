@@ -10,16 +10,18 @@ def print_message():
 def print_dir():
     return "pwd"
 
-def print_date():
+def print_date(data_interval_start=None, data_interval_end=None):
     print(f"Current date is: {datetime.now().date()}")
+    print(f"DAG start date is: {data_interval_start} - {data_interval_end}")
 
 with DAG (
     "hello_world", # Required
     start_date=datetime(2024,1,1), # Required
+
     #schedule="0/5 * * * *", # Used Cron Notation
     #schedule=timedelta(hours=1), 
     #schedule="@continuous", 
-    schedule="@hourly", # Presets but get interpreted as cron 0 * * * * 
+    #schedule="@hourly", # Presets but get interpreted as cron 0 * * * * 
     
     catchup=False # Required - Should it run the Dag for the intervals that were missed
 ) as dag:
