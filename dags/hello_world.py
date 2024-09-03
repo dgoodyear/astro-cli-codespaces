@@ -16,6 +16,9 @@ def print_date():
 with DAG (
     "hello_world", # Required
     start_date=datetime(2024,1,1), # Required
+    #schedule="0/5 * * * *",
+    schedule="@hourly",
+    
     catchup=False # Required
 ) as dag:
     
