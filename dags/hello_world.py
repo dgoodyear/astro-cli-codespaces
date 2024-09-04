@@ -2,17 +2,32 @@ from airflow import DAG
 from datetime import datetime
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 
+#import PostgresHook
 
 def print_message():
     print("Hello, Airflow!")
 
-def print_dir():
-    return "pwd"
-
 def print_date(data_interval_start=None, data_interval_end=None):
     print(f"Current date is: {datetime.now().date()}")
     print(f"DAG start date is: {data_interval_start} - {data_interval_end}")
+
+def get_db_connection(ti=None):
+    pg_hook = PostgresHook(postgres_conn_id="my_postgress_db")
+    results = pg_hook.get_first("SELECT conn_id FROM connection;")
+    first_rec = results[0]
+    print(first_rec)
+    print(f"Results: {results}") 
+    ti.xcom_push(key='first_rec_id', value=first_rec)
+
+def print_connection_id(ti=None):
+    connect_id = ti.xcom_pull(key='first_rec_id', task_ids='task_print_connection')
+    print(connect_id)
+
+ 
+
 
 with DAG (
     "hello_world", # Required
@@ -22,7 +37,8 @@ with DAG (
     #schedule=timedelta(hours=1), 
     #schedule="@continuous", 
     #schedule="@hourly", # Presets but get interpreted as cron 0 * * * * 
-    
+    schedule="@daily",
+
     catchup=False # Required - Should it run the Dag for the intervals that were missed
 ) as dag:
     
@@ -36,12 +52,28 @@ with DAG (
         python_callable=print_date
     )
 
-
     task_dir = BashOperator (
         task_id="task_dir", 
         bash_command="pwd"
-        #bash_command=print_dir
     )
 
-   # dependencies
-task_hello >> task_date >> task_dir
+    task_sql = SQLExecuteQueryOperator (
+        task_id="task_sql",
+        conn_id="my_postgress_db",
+        sql="SELECT conn_id FROM connection;"        
+    )
+
+    task_sql_hook = PythonOperator (
+        task_id="task_sql_hook",  # Required in all operators
+        python_callable=get_db_connection
+    )
+
+
+    task_print_connection = PythonOperator (
+        task_id="task_print_connection",  # Required in all operators
+        python_callable=get_db_connection
+    )
+
+    # dependencies
+    task_hello >> task_date >> task_dir >> task_sql >> task_sql_hook
+    task_sql_hook >> task_print_connection
