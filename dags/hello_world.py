@@ -4,6 +4,8 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.models import Variable
+from airflow.providers.common.sql.sensors.sql import SqlSensor 
 
 #import PostgresHook
 
@@ -15,8 +17,9 @@ def print_date(data_interval_start=None, data_interval_end=None):
     print(f"DAG start date is: {data_interval_start} - {data_interval_end}")
 
 def get_db_connection(ti=None):
+    schema = Variable.get("schema") # Created via Airflow UI Admin->Variables
     pg_hook = PostgresHook(postgres_conn_id="my_postgress_db")
-    results = pg_hook.get_first("SELECT conn_id FROM connection;")
+    results = pg_hook.get_first("SELECT conn_id FROM {schema}.connection;")
     first_rec = results[0]
     print(first_rec)
     print(f"Results: {results}") 
@@ -42,6 +45,16 @@ with DAG (
     catchup=False # Required - Should it run the Dag for the intervals that were missed
 ) as dag:
     
+    wait_for_connection = SqlSensor(
+        task_id = "wait_for_connection",
+        conn_id = "my_postgress_db",
+        sql = "Select count(1) from connection where conn_id = 'my_postgress_db';",
+        poke_interval=60,
+        timeout=3600
+    
+    )
+
+
     task_hello = PythonOperator (
         task_id="task_hello",  # Required in all operators
         python_callable=print_message
@@ -74,6 +87,9 @@ with DAG (
         python_callable=get_db_connection
     )
 
+
+
+
     # dependencies
-    task_hello >> task_date >> task_dir >> task_sql >> task_sql_hook
-    task_sql_hook >> task_print_connection
+    wait_for_connection >> task_hello >> task_date >> task_dir 
+    task_dir >> task_sql >> task_sql_hook >> task_print_connection
